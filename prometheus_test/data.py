@@ -28,22 +28,6 @@ class DataManager:
         self.submission_data = {}
         self.last_completed_step = None
 
-        # Store keypair paths for each role
-        self.keypairs = {
-            "leader": {
-                "staking": os.getenv("LEADER_STAKING_KEYPAIR"),
-                "public": os.getenv("LEADER_PUBLIC_KEYPAIR"),
-            },
-            "worker1": {
-                "staking": os.getenv("WORKER1_STAKING_KEYPAIR"),
-                "public": os.getenv("WORKER1_PUBLIC_KEYPAIR"),
-            },
-            "worker2": {
-                "staking": os.getenv("WORKER2_STAKING_KEYPAIR"),
-                "public": os.getenv("WORKER2_PUBLIC_KEYPAIR"),
-            },
-        }
-
     def _parse_repo_info(self):
         """Parse repository owner and name from fork URL"""
         if not self.fork_url:
