@@ -1,0 +1,1532 @@
+
+=== File: setup.py ===
+
+-- Chunk 1 --
+// /app/repos/repo_3/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/setup.py:1-17
+from setuptools import setup, find_packages
+
+setup(
+    name="prometheus-test",
+    version="0.1.2",
+    description="Test framework for Prometheus tasks",
+    author="Laura Abro",
+    packages=find_packages(),
+    install_requires=[
+        "requests>=2.25.0",
+        "python-dotenv>=0.19.0",
+        "pymongo>=4.0.0",
+        "PyYAML>=6.0.0",
+        "typing-extensions>=4.0.0",
+    ],
+    python_requires=">=3.8",
+)
+
+=== File: .prettierrc ===
+
+-- Chunk 1 --
+// /app/repos/repo_3/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/.prettierrc:1-23
+{
+  "useTabs": false,
+  "tabWidth": 2,
+  "singleQuote": false,
+  "trailingComma": "all",
+  "printWidth": 120,
+  "arrowParens": "always",
+  "semi": true,
+  "overrides": [
+    {
+      "files": ["*.py"],
+      "options": {
+        "tabWidth": 4
+      }
+    },
+    {
+      "files": ".eslintrc",
+      "options": {
+        "parser": "json"
+      }
+    }
+  ]
+}
+
+=== File: README.md ===
+
+-- Chunk 1 --
+// /app/repos/repo_3/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/README.md:1-150
+# Prometheus Test Framework Usage Guide
+
+## Getting Started
+
+### Installation
+
+```bash
+pip install -e test-framework/
+```
+
+### Basic Structure
+
+A test implementation consists of three main components:
+
+1. Configuration Files
+2. Test Steps Definition
+3. Test Runner Script
+
+## Creating a Test
+
+### 1. Configuration
+
+#### Test Configuration (config.yaml)
+
+```yaml
+# Test Configuration
+task_id: "your_task_id" # Task identifier
+base_port: 5000 # Base port for worker servers, optional
+max_rounds: 3 # Maximum test rounds, optional
+
+# Paths
+data_dir: data # Test data directory, optional. defaults to the /data dir within your tests folder
+workers_config: workers.json # Worker configuration, relative to tests directory
+
+# MongoDB Configuration (if needed)
+mongodb:
+  database: your_database_name
+  collections:
+    collection_name:
+      data_file: data.json # Relative to data_dir
+      required_count: 1 # Minimum required documents
+```
+
+#### Worker Configuration (workers.json)
+
+```json
+{
+  "worker1": {
+    "port": 5001,
+    "env": {
+      "WORKER_ID": "worker1",
+      "OTHER_ENV": "value"
+    }
+  },
+  "worker2": {
+    "port": 5002,
+    "env": {
+      "WORKER_ID": "worker2"
+    }
+  }
+}
+```
+
+### 2. Defining Test Steps
+
+Create a `steps.py` file to define your test sequence:
+
+```python
+from prometheus_test import TestStep
+
+steps = [
+    TestStep(
+        name="step_name",                    # Unique step identifier
+        description="Step description",       # Human-readable description
+        prepare=your_prepare_function,        # Setup function
+        execute=your_execute_function,        # Main execution function
+        worker="worker_name",                # Worker that executes this step
+    ),
+    # Add more steps...
+]
+```
+
+If you need to add extra parameters when calling prepare or execute functions you can `partial` from `functools`
+
+```py
+from functools import partial
+
+...
+    TestStep(
+        name="step_name",
+        description="Step description",
+        prepare=your_prepare_function,
+        execute=partial(your_execute_function, extra_parameter=value),
+        worker="worker_name",
+    ),
+...
+
+```
+
+### 3. Test Runner Script
+
+Create a main test script (e.g., `e2e.py`) that sets up and runs your test sequence:
+
+```python
+from pathlib import Path
+from prometheus_test import TestRunner
+import dotenv
+
+# Load environment variables
+dotenv.load_dotenv()
+
+# Import your test steps
+from .steps import steps
+
+def main():
+    # Create test runner with config from YAML
+    base_dir = Path(__file__).parent
+    runner = TestRunner(
+        steps=steps,
+        config_file=base_dir / "config.yaml",
+        config_overrides={
+            "post_load_callback": your_callback_function  # Optional
+        }
+    )
+
+    # Run test sequence
+    runner.run(force_reset=False)
+
+if __name__ == "__main__":
+    main()
+```
+
+### 4. Post Load Callback
+
+If you're loading data from JSON files into MongoDB, you may need to do additional post processing (e.g. adding UUIDs). You can define a post load callback in `e2e.py` which will be automatically executed after the MongoDB collections have been populated.
+
+```python
+def post_load_callback(db):
+    """Modify database after initial load"""
+    for doc in db.collection.find():
+        # Modify documents as needed
+        db.collection.update_one({"_id": doc["_id"]}, {"$set": {"field": "value"}})
+```
+
+### 5. ENV Variables
+
+If you have an .env file in your agent's top level folder (for API keys, etc), those environment variables will be automatically loaded into your test script. If you want to add testing specific ENV variables or you need to override any values from you main .env, you can add a second .env in your tests/ directory, which will also be automatically loaded and overrides will be applied.
+
+## Test Data Management
+
+
+-- Chunk 2 --
+// /app/repos/repo_3/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/README.md:151-228
+### Directory Structure
+
+```
+orca-container
+  ├── .env
+  ├──src/
+  ├──tests/
+    ├── .env
+    ├── data/
+    │    ├── collection1.json
+    │    └── collection2.json
+    ├── config.yaml
+    ├── workers.json
+    ├── e2e.py
+    └── steps.py
+```
+
+### Data Files
+
+Test data should be organized in JSON files within your data directory. Each file represents a collection's initial state. These files are then specified in your config.yaml (see above).
+
+## Writing Test Steps
+
+### Step Functions
+
+Each step requires two main functions:
+
+1. Prepare Function:
+
+```python
+def prepare(context):
+    """Setup before step execution"""
+    # Access configuration
+    task_id = context.config.task_id
+
+    # Setup prerequisites
+    return {
+        "key": "value"  # Data to pass to execute function
+    }
+```
+
+2. Execute Function:
+
+```python
+def execute(context, prepare_data):
+    """Execute the test step"""
+    # Access data from prepare
+    value = prepare_data["key"]
+
+    # Perform test operations, usually a call to the Flask server
+    result = some_operation()
+
+    # Sometimes you'll have steps that don't always run, add skip conditions to keep the test running
+      result = response.json()
+      if response.status_code == 409:
+          print("Skipping step")
+          return
+      elif not result.get("success"):
+          raise Exception(
+              f"Failed to execute step: {result.get('message')}"
+          )
+```
+
+## Running Tests
+
+Execute your test script:
+
+```bash
+python -m your_package.tests.e2e [--reset]
+```
+
+Options:
+
+- `--reset`: Force reset of all databases before running tests
+
+## Resuming a Previous Test
+
+Test state is saved in data_dir/test_state.json. If you run the test without the `--reset` flag, this state file will be used to resume your progress. You can also manually edit the file to alter the point at which you resume, but do note you may have to also edit the local SQLite DB and/or the remote MongoDB instance (if using) in order to keep the state in sync.
+
+=== File: .gitignore ===
+
+-- Chunk 1 --
+// /app/repos/repo_3/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/.gitignore:1-48
+.venv
+.env
+__pycache__
+.pytest_cache
+.pypirc
+*.db
+test
+test_state.json
+task_flow.egg-info
+example_repo
+signature.js
+git-filter-repo
+task/orca/
+**/dist/
+# yarn.lock
+package-lock.json
+node_modules
+build
+migrate.sh
+*/dev.js
+executables/*
+namespace/*
+config/*
+.env.local
+taskStateInfoKeypair.json
+localKOIIDB.db
+metadata.json
+.npmrc
+*.pem
+.vscode
+.cursor
+data/chunks
+data/process
+test_state.csv
+todos-example.csv
+
+
+# Ignore auto-generated repository directories
+repos/
+
+
+# Ignore Data
+data/*
+
+
+venv
+
+**/venv/
+
+=== File: prometheus_test.egg-info/requires.txt ===
+
+-- Chunk 1 --
+// /app/repos/repo_3/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/prometheus_test.egg-info/requires.txt:1-5
+requests>=2.25.0
+python-dotenv>=0.19.0
+pymongo>=4.0.0
+PyYAML>=6.0.0
+typing-extensions>=4.0.0
+
+=== File: prometheus_test.egg-info/SOURCES.txt ===
+
+-- Chunk 1 --
+// /app/repos/repo_3/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/prometheus_test.egg-info/SOURCES.txt:1-13
+README.md
+setup.py
+prometheus_test/__init__.py
+prometheus_test/data.py
+prometheus_test/runner.py
+prometheus_test/test_framework.py
+prometheus_test/utils.py
+prometheus_test/workers.py
+prometheus_test.egg-info/PKG-INFO
+prometheus_test.egg-info/SOURCES.txt
+prometheus_test.egg-info/dependency_links.txt
+prometheus_test.egg-info/requires.txt
+prometheus_test.egg-info/top_level.txt
+
+=== File: prometheus_test.egg-info/top_level.txt ===
+
+-- Chunk 1 --
+// /app/repos/repo_3/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/prometheus_test.egg-info/top_level.txt:1-1
+prometheus_test
+
+=== File: prometheus_test.egg-info/dependency_links.txt ===
+
+-- Chunk 1 --
+// /app/repos/repo_3/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/prometheus_test.egg-info/dependency_links.txt:1-1
+
+
+=== File: prometheus_test/test_framework.py ===
+
+=== File: prometheus_test/__init__.py ===
+
+-- Chunk 1 --
+// /app/repos/repo_3/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/repos/repo_0/prometheus_test/__init__.py:1-8
+"""
+Prometheus Test Framework - A framework for testing Prometheus tasks
+"""
+
+from .runner import TestStep, TestRunner
+from .workers import Worker
+
+__all__ = ["TestRunner", "TestStep", "Worker"]
+
+=== File: prometheus_test/workers.py ===
+
+-- Chunk 1 --
+// workers.py:16-125
+class Worker:
+    """Represents a worker in the test environment"""
+
+    def __init__(
+        self,
+        name: str,
+        base_dir: Path,
+        port: int,
+        env_vars: Dict[str, str],
+        keypairs: Dict[str, str],
+        server_entrypoint: Optional[Path] = None,
+    ):
+        self.name = name
+        self.base_dir = base_dir
+        self.port = port
+
+        base_env = base_dir / ".env"  # Test framework base .env
+        if base_env.exists():
+            load_dotenv(base_env, override=True)  # Override any existing values
+
+        # Load keypairs using provided paths or environment variables
+        staking_keypair_path = os.getenv(
+            keypairs.get("staking"), f"{name.upper()}_STAKING_KEYPAIR"
+        )
+        public_keypair_path = os.getenv(
+            keypairs.get("public"), f"{name.upper()}_PUBLIC_KEYPAIR"
+        )
+
+        # Load keypairs
+        self.staking_signing_key, self.staking_public_key = load_keypair(
+            staking_keypair_path
+        )
+        self.public_signing_key, self.public_key = load_keypair(public_keypair_path)
+
+        # Server configuration
+        self.url = f"http://localhost:{port}"
+        self.process = None
+        self.server_entrypoint = server_entrypoint
+        self.database_path = base_dir / f"database_{name}.db"
+
+        # Environment setup
+        self.env = os.environ.copy()
+        # For each environment variable in env_vars, get its value from the environment
+        for key, env_var_name in env_vars.items():
+            self.env[key] = os.getenv(env_var_name)
+        self.env["DATABASE_PATH"] = str(self.database_path)
+        self.env["PYTHONUNBUFFERED"] = "1"  # Always ensure unbuffered output
+        self.env["PORT"] = str(self.port)  # Set the port for the server
+
+    def _print_output(self, stream, prefix):
+        """Print output from a stream with a prefix"""
+        for line in stream:
+            print(f"{prefix} {line.strip()}")
+            sys.stdout.flush()
+
+    def start(self):
+        """Start the worker's server"""
+        print(f"\nStarting {self.name} server on port {self.port}...")
+        sys.stdout.flush()
+
+        # Start the process with unbuffered output
+        self.process = subprocess.Popen(
+            [sys.executable, str(self.server_entrypoint)],
+            env=self.env,
+            cwd=self.base_dir,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            bufsize=1,
+            universal_newlines=True,
+        )
+
+        # Wait for server to start
+        time.sleep(3)  # Default timeout
+
+        # Check if server started successfully
+        if self.process.poll() is not None:
+            _, stderr = self.process.communicate()
+            error_msg = stderr.strip() if stderr else "No error output available"
+            raise RuntimeError(f"Failed to start {self.name} server:\n{error_msg}")
+
+        stdout_thread = threading.Thread(
+            target=self._print_output,
+            args=(self.process.stdout, f"[{self.name}]"),
+            daemon=True,
+        )
+        stderr_thread = threading.Thread(
+            target=self._print_output,
+            args=(self.process.stderr, f"[{self.name} ERR]"),
+            daemon=True,
+        )
+        stdout_thread.start()
+        stderr_thread.start()
+
+    def stop(self):
+        """Stop the worker's server"""
+        if self.process:
+            print(f"\nStopping {self.name} server...")
+            sys.stdout.flush()
+
+            # Send SIGTERM first to allow graceful shutdown
+            os.kill(self.process.pid, signal.SIGTERM)
+            time.sleep(1)
+
+            # If still running, send SIGKILL
+            if self.process.poll() is None:
+                os.kill(self.process.pid, signal.SIGKILL)
+
+            # Wait for process to fully terminate
+            self.process.wait()
+            self.process = None
+
+-- Chunk 2 --
+// workers.py:128-197
+class TestEnvironment:
+    """Manages multiple workers for testing"""
+
+    def __init__(
+        self,
+        config_file: Path,
+        base_dir: Path,
+        base_port: int = 5000,
+        server_entrypoint: Optional[Path] = None,
+    ):
+        self.base_dir = base_dir
+
+        # Set default startup script if not provided
+        if server_entrypoint is None:
+            server_entrypoint = base_dir.parent / "main.py"
+            if not server_entrypoint.exists():
+                raise FileNotFoundError(
+                    f"Server entrypoint not found: {server_entrypoint}"
+                )
+
+        # Load worker configurations from file
+        with open(config_file) as f:
+            worker_configs = json.load(f)
+
+        # Create workers
+        self.workers: Dict[str, Worker] = {}
+        for i, (name, config) in enumerate(worker_configs.items()):
+            # Create worker with the new config structure
+            worker = Worker(
+                name=name,
+                base_dir=base_dir,
+                port=base_port + i,
+                env_vars=config.get("env_vars", {}),
+                keypairs=config.get("keypairs", {}),
+                server_entrypoint=server_entrypoint,
+            )
+            self.workers[name] = worker
+
+    def __enter__(self):
+        """Start all worker servers"""
+        print("Starting worker servers...")
+        try:
+            for worker in self.workers.values():
+                worker.start()
+            return self
+        except Exception as e:
+            print(f"Failed to start servers: {str(e)}")
+            self._cleanup()
+            raise
+
+    def __exit__(self, exc_type=None, exc_val=None, exc_tb=None):
+        """Stop all worker servers"""
+        print("Stopping worker servers...")
+        self._cleanup()
+
+    def _cleanup(self):
+        """Clean up all worker processes"""
+        for worker in self.workers.values():
+            if worker.process:
+                try:
+                    os.kill(worker.process.pid, signal.SIGTERM)
+                except ProcessLookupError:
+                    pass  # Process already gone
+                worker.process = None
+
+    def get_worker(self, name: str) -> Worker:
+        """Get a worker by name"""
+        if name not in self.workers:
+            raise KeyError(f"No worker found with name: {name}")
+        return self.workers[name]
+
+=== File: prometheus_test/runner.py ===
+
+-- Chunk 1 --
+// runner.py:12-14
+class MongoCollectionConfig(TypedDict, total=False):
+    data_file: str  # Optional, not all collections need data files
+    required_count: int
+
+-- Chunk 2 --
+// runner.py:17-19
+class MongoConfig(TypedDict, total=False):
+    database: str
+    collections: Dict[str, MongoCollectionConfig]
+
+-- Chunk 3 --
+// runner.py:23-108
+class TestConfig:
+    """Configuration for the test runner"""
+
+    base_dir: Path = Path.cwd()
+    data_dir: Optional[Path] = None
+    workers_config: str = "workers.json"
+    task_id: str = "test-task-123"
+    base_port: int = 5000
+    middle_server_url: Optional[str] = None
+    server_entrypoint: Optional[Path] = None
+    max_rounds: Optional[int] = (
+        None  # Will be calculated from collection if not specified
+    )
+    rounds_collection: Optional[str] = (
+        "todos"  # Collection to use for calculating max_rounds
+    )
+    post_load_callback: Optional[Callable[[Any], None]] = (
+        None  # Callback for post-JSON data processing
+    )
+    mongodb: MongoConfig = field(
+        default_factory=lambda: {
+            "database": "builder247",
+            "collections": {
+                "issues": {"required_count": 1},
+                "todos": {"required_count": 1},
+                "systemprompts": {"required_count": 0},
+                "audits": {"required_count": 0},
+            },
+        }
+    )
+
+    @classmethod
+    def from_yaml(
+        cls, yaml_path: Path, base_dir: Optional[Path] = None
+    ) -> "TestConfig":
+        """Create TestConfig from a YAML file"""
+        # Load YAML config
+        with open(yaml_path) as f:
+            config = yaml.safe_load(f) or {}
+
+        # Use base_dir from argument or yaml_path's parent
+        base_dir = base_dir or yaml_path.parent
+        config["base_dir"] = base_dir
+
+        # Convert relative paths to absolute
+        if "data_dir" in config and not config["data_dir"].startswith("/"):
+            config["data_dir"] = base_dir / config["data_dir"]
+        if "server_entrypoint" in config and not config["server_entrypoint"].startswith(
+            "/"
+        ):
+            config["server_entrypoint"] = base_dir / config["server_entrypoint"]
+
+        # Merge MongoDB config with defaults
+        if "mongodb" in config:
+            default_mongodb = cls().mongodb
+            mongodb_config = config["mongodb"]
+
+            # Use default database if not specified
+            if "database" not in mongodb_config:
+                mongodb_config["database"] = default_mongodb["database"]
+
+            # Merge collection configs with defaults
+            if "collections" in mongodb_config:
+                for coll_name, default_coll in default_mongodb["collections"].items():
+                    if coll_name not in mongodb_config["collections"]:
+                        mongodb_config["collections"][coll_name] = default_coll
+                    else:
+                        # Merge with default collection config
+                        mongodb_config["collections"][coll_name] = {
+                            **default_coll,
+                            **mongodb_config["collections"][coll_name],
+                        }
+
+        # Create instance with YAML values, falling back to defaults
+        return cls(**{k: v for k, v in config.items() if k in cls.__dataclass_fields__})
+
+    def __post_init__(self):
+        # Convert string paths to Path objects
+        self.base_dir = Path(self.base_dir)
+        if self.data_dir:
+            self.data_dir = Path(self.data_dir)
+        else:
+            self.data_dir = self.base_dir / "data"
+
+        if self.server_entrypoint:
+            self.server_entrypoint = Path(self.server_entrypoint)
+
+-- Chunk 4 --
+// runner.py:112-122
+class TestStep:
+    """Represents a single step in a task test sequence"""
+
+    name: str
+    description: str
+    worker: str
+    prepare: Callable[[], Dict[str, Any]]  # Returns data needed for the step
+    execute: Callable[Dict[str, Any], Any]  # Takes prepared data and executes step
+    validate: Optional[Callable[[Any, Any], None]] = (
+        None  # Optional validation function
+    )
+
+-- Chunk 5 --
+// runner.py:125-274
+class TestRunner:
+    """Main test runner that executes a sequence of test steps"""
+
+    def __init__(
+        self,
+        steps: List[TestStep],
+        config_file: Optional[Path] = None,
+        config_overrides: Optional[Dict[str, Any]] = None,
+    ):
+        """Initialize test runner with steps and optional config"""
+        self.steps = steps
+        self.config = TestConfig.from_yaml(config_file) if config_file else TestConfig()
+
+        # Apply any config overrides
+        if config_overrides:
+            for key, value in config_overrides.items():
+                if hasattr(self.config, key):
+                    setattr(self.config, key, value)
+                else:
+                    raise ValueError(f"Invalid config override: {key}")
+
+        # Initialize state
+        self.state = {}
+        self.current_round = 1
+        self.last_completed_step = None
+
+        # Ensure directories exist
+        self.config.data_dir.mkdir(parents=True, exist_ok=True)
+
+        # Initialize test environment and MongoDB client
+        self._test_env = None
+        self._mongo_client = None
+        self._max_rounds = None
+
+    @property
+    def mongo_client(self) -> MongoClient:
+        """Get MongoDB client, initializing if needed"""
+        if self._mongo_client is None:
+            # Get MongoDB URI from environment variable
+            mongodb_uri = os.getenv("MONGO_URI", "mongodb://localhost:27017")
+            self._mongo_client = MongoClient(mongodb_uri)
+        return self._mongo_client
+
+    @property
+    def max_rounds(self) -> int:
+        """Get maximum number of rounds, calculating from the specified collection if not set explicitly"""
+        if self._max_rounds is None:
+            if self.config.max_rounds is not None:
+                self._max_rounds = self.config.max_rounds
+            else:
+                # Count documents in the specified collection and add 1
+                if not self.config.rounds_collection:
+                    raise ValueError(
+                        "No collection specified for calculating max_rounds"
+                    )
+
+                db = self.mongo_client[self.config.mongodb["database"]]
+                if self.config.rounds_collection not in db.list_collection_names():
+                    raise ValueError(
+                        f"Collection {self.config.rounds_collection} does not exist"
+                    )
+
+                self._max_rounds = (
+                    db[self.config.rounds_collection].count_documents(
+                        {"taskId": self.config.task_id}
+                    )
+                    + 1
+                )
+                print(
+                    f"\nCalculated {self._max_rounds} rounds from {self.config.rounds_collection} collection"
+                )
+        return self._max_rounds
+
+    def check_mongodb_state(self) -> bool:
+        """Check if MongoDB is in the expected state
+
+        Returns:
+            bool: True if all collections exist and have required document counts
+        """
+        db = self.mongo_client[self.config.mongodb["database"]]
+
+        for coll_name, coll_config in self.config.mongodb["collections"].items():
+            # Skip if collection doesn't exist and no documents required
+            if coll_config.get("required_count", 0) == 0:
+                continue
+
+            # Check if collection exists and has required documents
+            if coll_name not in db.list_collection_names():
+                print(f"Collection {coll_name} does not exist")
+                return False
+
+            count = db[coll_name].count_documents({"taskId": self.config.task_id})
+            if count < coll_config["required_count"]:
+                print(
+                    f"Collection {coll_name} has {count} documents, requires {coll_config['required_count']}"
+                )
+                return False
+
+        return True
+
+    def reset_local_databases(self):
+        """Reset all local database files"""
+        print("\nResetting local databases...")
+        for worker in self.test_env.workers.values():
+            if worker.database_path.exists():
+                print(f"Deleting database file: {worker.database_path}")
+                worker.database_path.unlink()
+
+    def reset_mongodb(self):
+        """Reset MongoDB database and import data files from config"""
+        print("\nResetting MongoDB database...")
+
+        # Connect to MongoDB
+        db = self.mongo_client[self.config.mongodb["database"]]
+
+        # Clear collections
+        print("\nClearing collections...")
+        for collection in self.config.mongodb["collections"]:
+            db[collection].delete_many({})
+
+        # Import data files
+        for coll_name, coll_config in self.config.mongodb["collections"].items():
+            if "data_file" not in coll_config:
+                continue
+
+            data_file = self.config.data_dir / coll_config["data_file"]
+            if not data_file.exists():
+                if coll_config.get("required_count", 0) > 0:
+                    raise FileNotFoundError(
+                        f"Required data file not found: {data_file}"
+                    )
+                continue
+
+            print(f"Importing data for {coll_name} from {data_file}")
+            with open(data_file) as f:
+                data = json.load(f)
+                if not isinstance(data, list):
+                    data = [data]
+
+                # Add task_id to all documents
+                for item in data:
+                    item["taskId"] = self.config.task_id
+
+                # Insert data into collection
+                db[coll_name].insert_many(data)
+
+        # Run post-load callback if provided
+        if self.config.post_load_callback:
+            print("\nRunning post-load data processing...")
+            self.config.post_load_callback(db)
+
+-- Chunk 6 --
+// runner.py:275-424
+
+        # Reset max_rounds cache after data import
+        self._max_rounds = None
+
+    def ensure_clean_state(self, force_reset: bool = False):
+        """Ensure databases are in a clean state
+
+        Args:
+            force_reset: If True, always reset databases regardless of current state
+        """
+        needs_reset = force_reset or not self.check_mongodb_state()
+
+        if needs_reset:
+            print("\nResetting databases...")
+            self.reset_local_databases()
+            self.reset_mongodb()
+            self.reset_state()
+
+    @property
+    def test_env(self) -> TestEnvironment:
+        """Get the test environment, initializing if needed"""
+        if self._test_env is None:
+            workers_config = Path(self.config.workers_config)
+            if not workers_config.is_absolute():
+                workers_config = self.config.base_dir / workers_config
+
+            self._test_env = TestEnvironment(
+                config_file=workers_config,
+                base_dir=self.config.base_dir,
+                base_port=self.config.base_port,
+                server_entrypoint=self.config.server_entrypoint,
+            )
+        return self._test_env
+
+    def get_worker(self, name: str):
+        """Get a worker by name"""
+        return self.test_env.get_worker(name)
+
+    def save_state(self):
+        """Save current test state to file"""
+        state_file = self.config.data_dir / "test_state.json"
+        # Add current round and step to state before saving
+        self.state["current_round"] = self.current_round
+        if self.last_completed_step:
+            self.state["last_completed_step"] = self.last_completed_step
+        with open(state_file, "w") as f:
+            json.dump(self.state, f, indent=2)
+
+    def load_state(self):
+        """Load test state from file if it exists"""
+        state_file = self.config.data_dir / "test_state.json"
+        if state_file.exists():
+            with open(state_file, "r") as f:
+                self.state = json.load(f)
+                # Restore current round and step from state
+                self.current_round = self.state.get("current_round", 1)
+                self.last_completed_step = self.state.get("last_completed_step")
+            return True
+        return False
+
+    def reset_state(self):
+        """Clear the current state"""
+        self.state = {
+            "rounds": {},
+            "current_round": 1,
+        }
+        self.last_completed_step = None
+        state_file = self.config.data_dir / "test_state.json"
+        if state_file.exists():
+            state_file.unlink()
+
+    def log_step(self, step: TestStep):
+        """Log test step execution"""
+        print("\n" + "#" * 80)
+        print(f"STEP {step.name}: {step.description}")
+        print("#" * 80)
+
+    @contextmanager
+    def run_environment(self):
+        """Context manager for running the test environment"""
+        with self.test_env:
+            try:
+                self.load_state()
+                yield
+            finally:
+                self.save_state()
+
+    def next_round(self):
+        """Move to next round"""
+        self.current_round += 1
+        # Initialize state for new round if needed
+        if "rounds" not in self.state:
+            self.state["rounds"] = {}
+        if str(self.current_round) not in self.state["rounds"]:
+            self.state["rounds"][str(self.current_round)] = {}
+        self.state["current_round"] = self.current_round
+        self.last_completed_step = None
+
+    def run(self, force_reset=False):
+        """Run the test sequence."""
+        # Try to load existing state
+        has_state = self.load_state()
+
+        # Reset if:
+        # 1. --reset flag is used (force_reset)
+        # 2. No existing state file
+        # 3. State file exists but no steps completed yet
+        if force_reset or not has_state or not self.last_completed_step:
+            print("\nStarting fresh test run...")
+            self.ensure_clean_state(force_reset)
+        else:
+            print(
+                f"\nResuming from step {self.last_completed_step} in round {self.current_round}..."
+            )
+
+        try:
+            with self.run_environment():
+                while self.current_round <= self.max_rounds:
+                    round_steps = [s for s in self.steps]
+
+                    # Find the index to start from based on last completed step
+                    start_index = 0
+                    if self.last_completed_step:
+                        for i, step in enumerate(round_steps):
+                            if step.name == self.last_completed_step:
+                                start_index = i + 1
+                                break
+
+                    # Skip already completed steps
+                    for step in round_steps[start_index:]:
+                        self.log_step(step)
+
+                        worker = self.get_worker(step.worker)
+                        # Prepare step data
+                        data = step.prepare(self, worker)
+
+                        # Execute step
+                        result = step.execute(self, worker, data)
+
+                        # Check for errors
+                        if not result.get("success"):
+                            error_msg = result.get("error", "Unknown error")
+                            raise RuntimeError(f"Step {step.name} failed: {error_msg}")
+                        # Save state after successful step
+                        self.last_completed_step = step.name
+                        self.save_state()
+
+                    # Move to next round after completing all steps
+                    if self.current_round < self.max_rounds:
+                        self.next_round()
+
+-- Chunk 7 --
+// runner.py:425-438
+                    else:
+                        print("\nAll rounds completed successfully!")
+                        break
+
+        except Exception as e:
+            print(f"\nTest run failed: {str(e)}")
+            raise
+        finally:
+            # Ensure we always clean up, even if there's an error
+            if hasattr(self, "_test_env") and self._test_env:
+                print("\nCleaning up test environment...")
+                self._test_env._cleanup()
+
+        print("\nTest run completed.")
+
+=== File: prometheus_test/data.py ===
+
+-- Chunk 1 --
+// data.py:10-159
+class DataManager:
+    def __init__(self, task_id=None, round_number=None):
+        # Task info
+        self.task_id = task_id
+        self.round_number = round_number
+
+        # Repository info
+        self.fork_url = None
+        self.repo_owner = None
+        self.repo_name = None
+        self.branch_name = None
+
+        # All rounds data
+        self.rounds = {}
+
+        # Current round data
+        self.issue_uuid = None
+        self.pr_urls = {}
+        self.submission_data = {}
+        self.last_completed_step = None
+
+        # Store keypair paths for each role
+        self.keypairs = {
+            "leader": {
+                "staking": os.getenv("LEADER_STAKING_KEYPAIR"),
+                "public": os.getenv("LEADER_PUBLIC_KEYPAIR"),
+            },
+            "worker1": {
+                "staking": os.getenv("WORKER1_STAKING_KEYPAIR"),
+                "public": os.getenv("WORKER1_PUBLIC_KEYPAIR"),
+            },
+            "worker2": {
+                "staking": os.getenv("WORKER2_STAKING_KEYPAIR"),
+                "public": os.getenv("WORKER2_PUBLIC_KEYPAIR"),
+            },
+        }
+
+    def _parse_repo_info(self):
+        """Parse repository owner and name from fork URL"""
+        if not self.fork_url:
+            return None, None
+        parts = self.fork_url.strip("/").split("/")
+        if len(parts) >= 2:
+            return parts[-2], parts[-1]
+        return None, None
+
+    def set_fork_url(self, url):
+        """Set fork URL and update repo info"""
+        self.fork_url = url
+        self.repo_owner, self.repo_name = self._parse_repo_info()
+
+    def get_round_data(self):
+        """Get the current round's data as a dictionary"""
+        data = {
+            "last_completed_step": self.last_completed_step,
+            "issue_uuid": self.issue_uuid,
+        }
+        if self.pr_urls:
+            data["pr_urls"] = self.pr_urls
+        if self.submission_data:
+            data["submission_data"] = self.submission_data
+        return data
+
+    def set_round_data(self, round_data):
+        """Set the current round's data from a dictionary"""
+        self.last_completed_step = round_data.get("last_completed_step")
+        self.issue_uuid = round_data.get("issue_uuid")
+        self.pr_urls = round_data.get("pr_urls", {})
+        self.submission_data = round_data.get("submission_data", {})
+        # Store in rounds data too
+        self.rounds[str(self.round_number)] = round_data
+
+    def clear_round_data(self):
+        """Clear round-specific data when starting a new round"""
+        self.pr_urls = {}
+        self.submission_data = {}
+        self.last_completed_step = None
+
+    def _load_keypair(self, keypair_path: str) -> tuple[SigningKey, str]:
+        """Load a keypair from file and return signing key and public key."""
+        with open(keypair_path) as f:
+            keypair_bytes = bytes(json.load(f))
+            private_key = keypair_bytes[:32]
+            signing_key = SigningKey(private_key)
+            verify_key = signing_key.verify_key
+            public_key = base58.b58encode(bytes(verify_key)).decode("utf-8")
+            return signing_key, public_key
+
+    def create_signature(self, role: str, payload: Dict[str, Any]) -> Dict[str, str]:
+        """Create signatures for a payload using the specified role's keypair."""
+        try:
+            keypair = self.keypairs[role]
+            staking_keypair_path = keypair["staking"]
+            public_keypair_path = keypair["public"]
+
+            if not staking_keypair_path or not public_keypair_path:
+                return {
+                    "staking_key": "dummy_staking_key",
+                    "pub_key": "dummy_pub_key",
+                    "staking_signature": "dummy_staking_signature",
+                    "public_signature": "dummy_public_signature",
+                }
+
+            # Load keypairs
+            staking_signing_key, staking_key = self._load_keypair(staking_keypair_path)
+            public_signing_key, pub_key = self._load_keypair(public_keypair_path)
+
+            # Add required fields if not present
+            if "pubKey" not in payload:
+                payload["pubKey"] = pub_key
+            if "stakingKey" not in payload:
+                payload["stakingKey"] = staking_key
+            if "githubUsername" not in payload:
+                payload["githubUsername"] = os.getenv(f"{role.upper()}_GITHUB_USERNAME")
+
+            # Convert payload to string with sorted keys
+            payload_str = json.dumps(payload, sort_keys=True).encode()
+
+            # Create signatures
+            staking_signed = staking_signing_key.sign(payload_str)
+            public_signed = public_signing_key.sign(payload_str)
+
+            # Combine signatures with payload
+            staking_combined = staking_signed.signature + payload_str
+            public_combined = public_signed.signature + payload_str
+
+            # Encode combined data
+            staking_signature = base58.b58encode(staking_combined).decode()
+            public_signature = base58.b58encode(public_combined).decode()
+
+            return {
+                "staking_key": staking_key,
+                "pub_key": pub_key,
+                "staking_signature": staking_signature,
+                "public_signature": public_signature,
+            }
+        except Exception as e:
+            print(f"Error creating signatures: {e}")
+            return {
+                "staking_key": "dummy_staking_key",
+                "pub_key": "dummy_pub_key",
+                "staking_signature": "dummy_staking_signature",
+                "public_signature": "dummy_public_signature",
+            }
+
+    def prepare_create_aggregator_repo(
+        self,
+    ) -> Dict[str, Any]:
+        """Prepare payload for create-aggregator-repo endpoint."""
+
+
+-- Chunk 2 --
+// data.py:160-309
+        return {
+            "taskId": self.task_id,
+        }
+
+    def prepare_worker_task(self, role: str, round_number: int) -> Dict[str, Any]:
+        """Prepare payload for worker-task endpoint."""
+        if not self.fork_url or not self.branch_name:
+            raise Exception(
+                "Fork URL and branch name must be set before preparing worker task"
+            )
+
+        # Create fetch-todo payload for stakingSignature and publicSignature
+        fetch_todo_payload = {
+            "taskId": self.task_id,
+            "roundNumber": round_number,
+            "action": "fetch-todo",
+            "githubUsername": os.getenv(f"{role.upper()}_GITHUB_USERNAME"),
+        }
+
+        # Create add-pr payload for addPRSignature
+        add_pr_payload = {
+            "taskId": self.task_id,
+            "roundNumber": round_number,
+            "action": "add-todo-pr",
+            "githubUsername": os.getenv(f"{role.upper()}_GITHUB_USERNAME"),
+        }
+
+        # Get signatures for fetch-todo
+        fetch_signatures = self.create_signature(role, fetch_todo_payload)
+
+        # Create addPRSignature for add-pr
+        # We need to manually create this signature since our create_signature method
+        # doesn't support multiple payloads in one call
+        try:
+            keypair = self.keypairs[role]
+            staking_keypair_path = keypair["staking"]
+
+            if not staking_keypair_path:
+                add_pr_signature = "dummy_add_pr_signature"
+            else:
+                # Load staking keypair for add-todo-pr signature
+                staking_signing_key, _ = self._load_keypair(staking_keypair_path)
+
+                # Update add_pr_payload with staking key and pub key
+                add_pr_payload["stakingKey"] = fetch_signatures["staking_key"]
+                add_pr_payload["pubKey"] = fetch_signatures["pub_key"]
+
+                # Create add-todo-pr signature
+                payload_str = json.dumps(add_pr_payload, sort_keys=True).encode()
+                staking_signed = staking_signing_key.sign(payload_str)
+                staking_combined = staking_signed.signature + payload_str
+                add_pr_signature = base58.b58encode(staking_combined).decode()
+        except Exception as e:
+            print(f"Error creating add-PR signature: {e}")
+            add_pr_signature = "dummy_add_pr_signature"
+
+        # Match exactly what 1-task.ts sends
+        return {
+            "taskId": self.task_id,
+            "roundNumber": round_number,
+            "stakingKey": fetch_signatures["staking_key"],
+            "pubKey": fetch_signatures["pub_key"],
+            "stakingSignature": fetch_signatures["staking_signature"],
+            "publicSignature": fetch_signatures["public_signature"],
+            "addPRSignature": add_pr_signature,
+        }
+
+    def create_submitter_signature(
+        self, submitter_role: str, payload: Dict[str, Any]
+    ) -> str:
+        """Create signature using the submitter's staking key."""
+        try:
+            staking_keypair_path = self.keypairs[submitter_role]["staking"]
+            if staking_keypair_path:
+                staking_signing_key, _ = self._load_keypair(staking_keypair_path)
+                payload_str = json.dumps(payload, sort_keys=True).encode()
+                staking_signed = staking_signing_key.sign(payload_str)
+                staking_combined = staking_signed.signature + payload_str
+                return base58.b58encode(staking_combined).decode()
+            else:
+                print(f"Warning: No staking keypair path for {submitter_role}")
+                return "dummy_submitter_signature"
+        except Exception as e:
+            print(f"Error creating submitter signature: {e}")
+            return "dummy_submitter_signature"
+
+    def prepare_worker_audit(
+        self,
+        auditor: str,
+        pr_url: str,
+        round_number: int,
+        submission_data: Dict[str, Any] = None,
+    ) -> Dict[str, Any]:
+        """Prepare payload for worker-audit endpoint."""
+        if not submission_data:
+            raise ValueError("Submission data is required for worker audit")
+
+        # Create auditor payload which is used to generate the signature
+        auditor_payload = {
+            "taskId": self.task_id,
+            "roundNumber": round_number,
+            "prUrl": pr_url,
+        }
+
+        # Create auditor's signatures with the complete payload
+        auditor_signatures = self.create_signature(auditor, auditor_payload)
+
+        # Structure the payload according to what the server expects
+        return {
+            "submission": {
+                "taskId": self.task_id,
+                "roundNumber": round_number,
+                "prUrl": pr_url,
+                "githubUsername": submission_data.get("githubUsername"),
+                "repoOwner": self.repo_owner,
+                "repoName": self.repo_name,
+                "stakingKey": submission_data.get("stakingKey"),
+                "pubKey": submission_data.get("pubKey"),
+                "uuid": submission_data.get("uuid"),
+                "nodeType": submission_data.get("nodeType"),
+            },
+            "submitterSignature": submission_data.get("signature"),
+            "submitterStakingKey": submission_data.get("stakingKey"),
+            "submitterPubKey": submission_data.get("pubKey"),
+            "prUrl": pr_url,
+            "repoOwner": self.repo_owner,
+            "repoName": self.repo_name,
+            "githubUsername": os.getenv(f"{auditor.upper()}_GITHUB_USERNAME"),
+            "stakingKey": auditor_signatures["staking_key"],
+            "pubKey": auditor_signatures["pub_key"],
+            "stakingSignature": auditor_signatures["staking_signature"],
+            "publicSignature": auditor_signatures["public_signature"],
+        }
+
+    def prepare_leader_task(self, role: str, round_number: int) -> Dict[str, Any]:
+        """Prepare payload for leader-task endpoint."""
+        # Create fetch-issue payload for stakingSignature and publicSignature
+        fetch_issue_payload = {
+            "taskId": self.task_id,
+            "roundNumber": round_number,
+            "action": "fetch-issue",
+            "githubUsername": os.getenv(f"{role.upper()}_GITHUB_USERNAME"),
+        }
+
+        # Create add-pr payload for addPRSignature
+        add_pr_payload = {
+            "taskId": self.task_id,
+            "roundNumber": round_number,
+            "action": "add-issue-pr",
+            "githubUsername": os.getenv(f"{role.upper()}_GITHUB_USERNAME"),
+
+-- Chunk 3 --
+// data.py:310-459
+        }
+
+        # Get signatures for fetch-issue
+        fetch_signatures = self.create_signature(role, fetch_issue_payload)
+
+        # Create addPRSignature for add-pr
+        try:
+            keypair = self.keypairs[role]
+            staking_keypair_path = keypair["staking"]
+
+            if not staking_keypair_path:
+                add_pr_signature = "dummy_add_pr_signature"
+            else:
+                # Load staking keypair for add-todo-pr signature
+                staking_signing_key, _ = self._load_keypair(staking_keypair_path)
+
+                # Update add_pr_payload with staking key and pub key
+                add_pr_payload["stakingKey"] = fetch_signatures["staking_key"]
+                add_pr_payload["pubKey"] = fetch_signatures["pub_key"]
+
+                # Create add-todo-pr signature
+                payload_str = json.dumps(add_pr_payload, sort_keys=True).encode()
+                staking_signed = staking_signing_key.sign(payload_str)
+                staking_combined = staking_signed.signature + payload_str
+                add_pr_signature = base58.b58encode(staking_combined).decode()
+        except Exception as e:
+            print(f"Error creating add-PR signature: {e}")
+            add_pr_signature = "dummy_add_pr_signature"
+
+        # Match exactly what 1-task.ts sends
+        return {
+            "taskId": self.task_id,
+            "roundNumber": round_number,
+            "stakingKey": fetch_signatures["staking_key"],
+            "pubKey": fetch_signatures["pub_key"],
+            "stakingSignature": fetch_signatures["staking_signature"],
+            "publicSignature": fetch_signatures["public_signature"],
+            "addPRSignature": add_pr_signature,
+        }
+
+    def extract_staking_key_from_pr(self, pr_url: str) -> str:
+        """Extract staking key from PR description"""
+        parts = pr_url.strip("/").split("/")
+        pr_number = int(parts[-1])
+        pr_repo_owner = parts[-4]
+        pr_repo_name = parts[-3]
+
+        gh = Github(os.getenv("GITHUB_TOKEN"))
+        repo = gh.get_repo(f"{pr_repo_owner}/{pr_repo_name}")
+        pr = repo.get_pull(pr_number)
+
+        staking_section = extract_section(pr.body, "STAKING_KEY")
+        if not staking_section:
+            raise ValueError(f"No staking key found in PR {pr_url}")
+
+        return staking_section.split(":")[0].strip()
+
+    def prepare_aggregator_info(self, role: str, round_number: int) -> Dict[str, Any]:
+        """Prepare payload for add-aggregator-info endpoint."""
+        if not self.fork_url or not self.branch_name:
+            raise Exception(
+                "Fork URL and branch name must be set before preparing aggregator info"
+            )
+
+        # Create the payload with all required fields
+        payload = {
+            "taskId": self.task_id,
+            "roundNumber": round_number,
+            "action": "create-repo",
+            "githubUsername": os.getenv(f"{role.upper()}_GITHUB_USERNAME"),
+            "issueUuid": self.branch_name,
+            "aggregatorUrl": self.fork_url,
+        }
+
+        # Create signature with the complete payload
+        signatures = self.create_signature(role, payload)
+
+        # Return the final payload with signature
+        return {
+            "taskId": self.task_id,
+            "roundNumber": round_number,
+            "action": "create-repo",
+            "githubUsername": os.getenv(f"{role.upper()}_GITHUB_USERNAME"),
+            "stakingKey": signatures["staking_key"],
+            "pubKey": signatures["pub_key"],
+            "issueUuid": self.branch_name,
+            "aggregatorUrl": self.fork_url,
+            "signature": signatures["staking_signature"],
+        }
+
+    def prepare_leader_audit(
+        self,
+        auditor: str,
+        pr_url: str,
+        round_number: int,
+        submission_data: Dict[str, Any] = None,
+    ) -> Dict[str, Any]:
+        """Prepare payload for leader-audit endpoint."""
+        if not submission_data:
+            raise ValueError("Submission data is required for leader audit")
+
+        # Create auditor payload (what the worker would sign to audit)
+        auditor_payload = {
+            "taskId": self.task_id,
+            "roundNumber": round_number,
+            "prUrl": pr_url,
+        }
+
+        # Create auditor's signatures
+        auditor_signatures = self.create_signature(auditor, auditor_payload)
+
+        # Structure the payload according to the audit.ts implementation
+        # Use all fields from the submission_data
+        return {
+            "submission": {
+                "taskId": self.task_id,
+                "roundNumber": round_number,
+                "prUrl": pr_url,
+                "githubUsername": submission_data.get("githubUsername"),
+                "repoOwner": self.repo_owner,
+                "repoName": self.repo_name,
+                "stakingKey": submission_data.get("stakingKey"),
+                "pubKey": submission_data.get("pubKey"),
+                "uuid": submission_data.get("uuid"),
+                "nodeType": submission_data.get("nodeType"),
+            },
+            "submitterSignature": submission_data.get("signature"),
+            "submitterStakingKey": submission_data.get("stakingKey"),
+            "submitterPubKey": submission_data.get("pubKey"),
+            "stakingKey": auditor_signatures["staking_key"],
+            "pubKey": auditor_signatures["pub_key"],
+            "stakingSignature": auditor_signatures["staking_signature"],
+            "publicSignature": auditor_signatures["public_signature"],
+            "prUrl": pr_url,
+            "repoOwner": self.repo_owner,
+            "repoName": self.repo_name,
+            "githubUsername": os.getenv(f"{auditor.upper()}_GITHUB_USERNAME"),
+        }
+
+    def get_keys(self, role: str) -> Dict[str, str]:
+        """Get the staking and public keys for a given role."""
+        try:
+            keypair = self.keypairs[role]
+            staking_keypair_path = keypair["staking"]
+            public_keypair_path = keypair["public"]
+
+            if not staking_keypair_path or not public_keypair_path:
+                return {
+                    "staking_key": "dummy_staking_key",
+                    "pub_key": "dummy_pub_key",
+
+-- Chunk 4 --
+// data.py:460-475
+                }
+
+            # Load keypairs
+            _, staking_key = self._load_keypair(staking_keypair_path)
+            _, pub_key = self._load_keypair(public_keypair_path)
+
+            return {
+                "staking_key": staking_key,
+                "pub_key": pub_key,
+            }
+        except Exception as e:
+            print(f"Error getting keys: {e}")
+            return {
+                "staking_key": "dummy_staking_key",
+                "pub_key": "dummy_pub_key",
+            }
+
+=== File: prometheus_test/utils.py ===
+
+-- Chunk 1 --
+// utils.py:7-15
+def load_keypair(keypair_path: str) -> Tuple[SigningKey, str]:
+    """Load a keypair from file and return signing key and public key."""
+    with open(keypair_path) as f:
+        keypair_bytes = bytes(json.load(f))
+        private_key = keypair_bytes[:32]
+        signing_key = SigningKey(private_key)
+        verify_key = signing_key.verify_key
+        public_key = base58.b58encode(bytes(verify_key)).decode("utf-8")
+        return signing_key, public_key
+
+-- Chunk 2 --
+// utils.py:18-30
+def create_signature(signing_key: SigningKey, payload: Dict[str, Any]) -> str:
+    """Create a signature for a payload using the signing key."""
+    # Convert payload to string with sorted keys
+    payload_str = json.dumps(payload, sort_keys=True).encode()
+
+    # Create signature
+    signed = signing_key.sign(payload_str)
+
+    # Combine signature with payload
+    combined = signed.signature + payload_str
+
+    # Encode combined data
+    return base58.b58encode(combined).decode()
